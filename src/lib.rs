@@ -1,11 +1,16 @@
+#![warn(missing_docs)]
+
+#![doc = include_str!("../README.md")]
+
 use std::any;
 
-fn type_name_of<T>(_: T) -> &'static str {
+#[doc(hidden)]
+pub fn type_name_of<T>(_: T) -> &'static str {
     any::type_name::<T>()
 }
 
 #[macro_export]
-macro_rules! function_name {
+macro_rules! fn_name {
     () => {{
         // Hack from https://docs.rs/stdext/0.2.1/src/stdext/macros.rs.html#61-72
         fn f() {}
@@ -19,13 +24,12 @@ macro_rules! function_name {
 }
 
 #[macro_export]
-macro_rules! mock_if_some {
+macro_rules! stub_if_some {
     ($mock:expr) => {
         #[cfg(test)]
         {
             if let Some(state) = $mock {
-                println!("mocking!");
-                return state.get(function_name!());
+                return state.get(fn_name!());
             }
         }
     };
