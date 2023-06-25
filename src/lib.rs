@@ -9,6 +9,23 @@ pub fn type_name_of<T>(_: T) -> &'static str {
     any::type_name::<T>()
 }
 
+/// Gets the name of the current or given function as a `&'static str`
+///
+/// ```
+/// # use stubby::fn_name;
+/// fn fizz() {
+///     assert_eq!(fn_name!(), "fizz");
+///     assert_eq!(fn_name!(buzz), "buzz");
+///     assert_eq!(fn_name!(FizzBuzzer::run), "FizzBuzzer::run");
+/// }
+///
+/// fn buzz() {}
+///
+/// struct FizzBuzzer;
+///
+/// impl FizzBuzzer {
+///     fn run() {}
+/// }
 #[macro_export]
 macro_rules! fn_name {
     () => {{
@@ -23,6 +40,27 @@ macro_rules! fn_name {
     }};
 }
 
+/// Use at the start of a method to return a stub when in `#[cfg(test)]`
+///
+/// ```no_run
+/// use stubby::*;
+///
+/// struct FizzBuzzer(MockState);
+///
+/// impl FizzBuzzer {
+///     fn start(&self) -> String {
+///         stub_if_some!(&self.0);
+///         String::from("this when not testing")
+///     }
+/// }
+///
+/// #[test]
+/// fn fizzbuzzer_start() {
+///     let mut state = MockState::default();
+///     state.insert(fn_name!(FizzBuzzer::start), String::from("stub response!"));
+///     assert_eq!(FizzBuzzer(state).start(), String::from("stub response!"));
+/// }
+/// ```
 #[macro_export]
 macro_rules! stub_if_some {
     ($mock:expr) => {
