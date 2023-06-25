@@ -1,20 +1,20 @@
+use std::any;
+
+fn type_name_of<T>(_: T) -> &'static str {
+    any::type_name::<T>()
+}
+
 #[macro_export]
 macro_rules! function_name {
     () => {{
         // Hack from https://docs.rs/stdext/0.2.1/src/stdext/macros.rs.html#61-72
         fn f() {}
-        fn type_name_of<T>(_: T) -> &'static str {
-            std::any::type_name::<T>()
-        }
-        let name = type_name_of(f);
+        let name = $crate::type_name_of(f);
         // `3` is the length of the `::f`.
         &name[..name.len() - 3]
     }};
     ($fn:expr) => {{
-        fn type_name_of<T>(_: T) -> &'static str {
-            std::any::type_name::<T>()
-        }
-        type_name_of($fn)
+        $crate::type_name_of($fn)
     }};
 }
 
@@ -34,7 +34,7 @@ macro_rules! mock_if_some {
 #[cfg(not(test))]
 type MockStateInner = ();
 #[cfg(test)]
-type MockStateInner = std::collections::HashMap<&'static str, Box<dyn std::any::Any>>;
+type MockStateInner = std::collections::HashMap<&'static str, Box<dyn any::Any>>;
 
 #[derive(Default)]
 pub struct MockState(MockStateInner);
