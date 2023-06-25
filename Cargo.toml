@@ -1,6 +1,14 @@
 [package]
 name = "stubby"
+description = "stubbing that doesn't hurt you or your IDE"
+categories = ["development-tools::testing"]
+keywords = ["mock", "stub", "mocking", "stubbing", "testing"]
 version = "0.1.0"
 edition = "2021"
+authors = ["alpha-tango-kilo <git@heyatk.com>"]
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://codeberg.org/alpha-tango-kilo/stubby"
+repository = "https://codeberg.org/alpha-tango-kilo/stubby"
 
 [dependencies]

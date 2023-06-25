@@ -1,5 +1,4 @@
 #![warn(missing_docs)]
-
 #![doc = include_str!("../README.md")]
 
 use std::any;
@@ -76,7 +75,8 @@ macro_rules! stub_if_some {
 #[cfg(not(test))]
 type MockStateInner = ();
 #[cfg(test)]
-type MockStateInner = std::collections::HashMap<&'static str, Box<dyn any::Any>>;
+type MockStateInner =
+    std::collections::HashMap<&'static str, Box<dyn any::Any>>;
 
 #[derive(Default)]
 pub struct MockState(MockStateInner);
