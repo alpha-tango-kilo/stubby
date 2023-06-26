@@ -1,49 +1,26 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
-use std::any;
+use std::fmt;
 
-#[doc(hidden)]
-pub fn type_name_of<T>(_: T) -> &'static str {
-    any::type_name::<T>()
-}
-
-/// Gets the name of the current or given function as a `&'static str`
-///
-/// ```
-/// # use stubby::fn_name;
-/// fn fizz() {
-///     assert!(fn_name!().ends_with("fizz"));
-///     assert!(fn_name!(buzz).ends_with("buzz"));
-///     assert!(fn_name!(FizzBuzzer::run).ends_with("FizzBuzzer::run"));
-/// }
-///
-/// fn buzz() {}
-///
-/// struct FizzBuzzer;
-///
-/// impl FizzBuzzer {
-///     fn run() {}
-/// }
-///
-/// # fizz();
+/// Gets the name of the current or given function as a [`StubbyName`]
 #[macro_export]
 macro_rules! fn_name {
     () => {{
         // Hack from https://docs.rs/stdext/0.2.1/src/stdext/macros.rs.html#61-72
         fn f() {}
         fn type_name_of<T>(_: T) -> &'static str {
-            any::type_name::<T>()
+            std::any::type_name::<T>()
         }
         let name = type_name_of(f);
         // `3` is the length of the `::f`.
-        &name[..name.len() - 3]
+        $crate::StubbyName::__macro_new(&name[..name.len() - 3])
     }};
     ($fn:expr) => {{
         fn type_name_of<T>(_: T) -> &'static str {
-            any::type_name::<T>()
+            std::any::type_name::<T>()
         }
-        type_name_of($fn)
+        $crate::StubbyName::__macro_new(type_name_of($fn))
     }};
 }
 
@@ -138,11 +115,31 @@ macro_rules! stub {
     };
 }
 
+/// An interned string type for holding function names.
+/// Returned by [`fn_name!`]
+///
+/// Prevents trying to store mocks in [`StubbyState`] by just giving the method name as a `&str`
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct StubbyName(&'static str);
+
+impl StubbyName {
+    #[doc(hidden)]
+    pub fn __macro_new(name: &'static str) -> Self {
+        Self(name)
+    }
+}
+
+impl fmt::Display for StubbyName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
 #[cfg(not(test))]
 type StubbyStateInner = ();
 #[cfg(test)]
 type StubbyStateInner =
-    std::collections::HashMap<&'static str, Box<dyn any::Any>>;
+    std::collections::HashMap<StubbyName, Box<dyn std::any::Any>>;
 
 /// Stores stub information.
 /// Initialise with [`StubbyState::new`] or [`StubbyState::default`]
@@ -208,11 +205,11 @@ impl StubbyState {
     /// ```
     #[cfg(not(test))]
     #[allow(unused)]
-    pub fn insert<T: Clone + 'static>(&mut self, name: &'static str, obj: T) {
+    pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
         panic!("should not have stubs being used outside of #[cfg(test)]");
     }
     #[cfg(test)]
-    pub fn insert<T: Clone + 'static>(&mut self, name: &'static str, obj: T) {
+    pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
         self.0.insert(name, Box::new(obj));
     }
 
@@ -226,11 +223,11 @@ impl StubbyState {
     ///
     #[cfg(not(test))]
     #[allow(unused)]
-    pub fn get<T: Clone + 'static>(&self, name: &'static str) -> Option<T> {
+    pub fn get<T: Clone + 'static>(&self, name: StubbyName) -> Option<T> {
         panic!("should not have stubs being used outside of #[cfg(test)]");
     }
     #[cfg(test)]
-    pub fn get<T: Clone + 'static>(&self, name: &'static str) -> Option<T> {
+    pub fn get<T: Clone + 'static>(&self, name: StubbyName) -> Option<T> {
         self.0.get(&name).map(|any| {
             any.downcast_ref::<T>()
                 .unwrap_or_else(|| panic!("incorrect type supplied for {name}"))
