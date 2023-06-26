@@ -42,6 +42,7 @@ impl TestStruct {
 fn main() {
     let ts = TestStruct(StubbyState::default());
     assert_eq!(ts.foo(), 10);
+    assert_eq!(std::mem::size_of::<StubbyState>(), 0); // 👀 zero-sized in normal code = no overhead
 }
 
 #[test]
