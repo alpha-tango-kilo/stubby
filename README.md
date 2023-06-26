@@ -16,20 +16,31 @@ Stolen from [Wikipedia](https://en.wikipedia.org/wiki/Mock_object):
 
 ## Usage example
 
+You can `cargo add stubby`, or in your `Cargo.toml`:
+
+```toml
+[dependencies]
+stubby = "0.2"
+```
+
+Note that `stubby` has to go in your regular dependencies, not dev dependencies.
+
+Now, some code that uses `stubby`:
+
 ```rust
 use stubby::*;
 
-struct TestStruct(Option<StubbyState>);
+struct TestStruct(StubbyState);
 
 impl TestStruct {
     fn foo(&self) -> i32 {
-        stub_if_some!(&self.0);
+        stub!(&self.0);
         10
     }
 }
 
 fn main() {
-    let ts = TestStruct(None);
+    let ts = TestStruct(StubbyState::default());
     assert_eq!(ts.foo(), 10);
 }
 
@@ -37,7 +48,7 @@ fn main() {
 fn demo() {
     let mut mock = StubbyState::default();
     mock.insert(fn_name!(TestStruct::foo), 15);
-    let ts = TestStruct(mock.into());
+    let ts = TestStruct(mock);
     assert_eq!(ts.foo(), 15);
 }
 ```
@@ -59,6 +70,6 @@ It does this by instead storing mocking behaviour as an attribute of the struct 
 Avoiding procedural macros means slightly more boilerplate, though thanks to `stub_if_some!` that's usually only a single line per method.
 `stubby` still has zero cost when compiled outside of `#[cfg(test)]` by replacing its state with `()`, but it still presents the exact same interface in order to give your IDE the easiest time of it.
 
-As a bonus, `stubby` compiles far faster as it has zero dependencies, only uses declarative macros, and has 70 SLoC!
+As a bonus, `stubby` compiles far faster as it has zero dependencies, only uses declarative macros, and has under 100 SLoC!
 
 That having been said, it has only one of [`mockall`](https://lib.rs/crates/mockall)'s many features, and so if you're after a more feature-complete solution, check it out instead!

@@ -32,26 +32,40 @@ macro_rules! fn_name {
     () => {{
         // Hack from https://docs.rs/stdext/0.2.1/src/stdext/macros.rs.html#61-72
         fn f() {}
-        let name = $crate::type_name_of(f);
+        fn type_name_of<T>(_: T) -> &'static str {
+            any::type_name::<T>()
+        }
+        let name = type_name_of(f);
         // `3` is the length of the `::f`.
         &name[..name.len() - 3]
     }};
     ($fn:expr) => {{
-        $crate::type_name_of($fn)
+        fn type_name_of<T>(_: T) -> &'static str {
+            any::type_name::<T>()
+        }
+        type_name_of($fn)
     }};
 }
 
-/// Use at the start of a method to return a stub when in `#[cfg(test)]`
+/// Use at the start of a method to return a stub when in `#[cfg(test)]`, **if one is found**.
+/// If no stub is set, then the method executes normally
+///
+/// For unconditional stubbing, use [`stub!`]
 ///
 /// ```no_run
 /// use stubby::*;
 ///
-/// struct FizzBuzzer(Option<StubbyState>);
+/// struct FizzBuzzer(StubbyState);
 ///
 /// impl FizzBuzzer {
 ///     fn start(&self) -> String {
-///         stub_if_some!(&self.0);                 // 👈 here!
-///         String::from("this when not testing")
+///         stub_if_found!(&self.0);                 // 👈 here!
+///         String::from("this if no stub provided")
+///     }
+///
+///     fn next(&self) -> String {
+///         stub_if_found!(&self.0);                 // 👈 here!
+///         String::from("this if no stub provided")
 ///     }
 /// }
 ///
@@ -59,18 +73,67 @@ macro_rules! fn_name {
 /// fn fizzbuzzer_start() {
 ///     let mut state = StubbyState::default();
 ///     state.insert(fn_name!(FizzBuzzer::start), String::from("stub response!"));
-///     let fizzbuzzer = FizzBuzzer(state.into());
+///     let fizzbuzzer = FizzBuzzer(state);
 ///     assert_eq!(fizzbuzzer.start(), String::from("stub response!"));
+///     assert_eq!(fizzbuzzer.next(), String::from("this if no stub provided"));
 /// }
 /// ```
 #[macro_export]
-macro_rules! stub_if_some {
+macro_rules! stub_if_found {
     ($mock:expr) => {
         #[cfg(test)]
         {
-            if let Some(state) = $mock {
-                return state.get(fn_name!());
+            if let Some(t) = $mock.get(fn_name!()) {
+                return t;
             }
+        }
+    };
+}
+
+/// Use at the start of a method to return a stub when in `#[cfg(test)]`
+///
+/// # Panics
+///
+/// If no stub is set
+///
+/// For stubbing sometimes, use [`stub_if_found!`]
+///
+/// ```no_run
+/// use stubby::*;
+///
+/// struct FizzBuzzer(StubbyState);
+///
+/// impl FizzBuzzer {
+///     fn start(&self) -> String {
+///         stub!(&self.0);                 // 👈 here!
+///         String::from("this if no stub provided")
+///     }
+///
+///     fn next(&self) -> String {
+///         stub!(&self.0);                 // 👈 here!
+///         String::from("this if no stub provided")
+///     }
+/// }
+///
+/// #[test]
+/// fn fizzbuzzer_start() {
+///     let mut state = StubbyState::default();
+///     state.insert(fn_name!(FizzBuzzer::start), String::from("stub response!"));
+///     let fizzbuzzer = FizzBuzzer(state);
+///     assert_eq!(fizzbuzzer.start(), String::from("stub response!"));
+///     // ⚠ Would panic:
+///     // assert_eq!(fizzbuzzer.next(), String::from("this if no stub provided"));
+/// }
+/// ```
+#[macro_export]
+macro_rules! stub {
+    ($mock:expr) => {
+        #[cfg(test)]
+        {
+            let name = fn_name!();
+            $mock
+                .get()
+                .unwrap_or_else(|| panic!("no stub configured for {name}"))
         }
     };
 }
@@ -105,11 +168,11 @@ impl StubbyState {
     /// ```no_run
     /// use stubby::*;
     ///
-    /// struct Foo(Option<StubbyState>);
+    /// struct Foo(StubbyState);
     ///
     /// impl Foo {
     ///     fn return_four(&self) -> &'static str {
-    ///         stub_if_some!(&self.0);
+    ///         stub_if_found!(&self.0);
     ///         "four"
     ///     }
     /// }
@@ -126,11 +189,11 @@ impl StubbyState {
     /// ```no_run
     /// # use stubby::*;
     ///
-    /// struct Foo(Option<StubbyState>);
+    /// struct Foo(StubbyState);
     ///
     /// impl Foo {
     ///     fn return_four(&self) -> u32 {
-    ///         stub_if_some!(&self.0);
+    ///         stub_if_found!(&self.0);
     ///         4
     ///     }
     /// }
@@ -146,7 +209,7 @@ impl StubbyState {
     #[cfg(not(test))]
     #[allow(unused)]
     pub fn insert<T: Clone + 'static>(&mut self, name: &'static str, obj: T) {
-        panic!("should not have mocks being used outside of #[cfg(test)]");
+        panic!("should not have stubs being used outside of #[cfg(test)]");
     }
     #[cfg(test)]
     pub fn insert<T: Clone + 'static>(&mut self, name: &'static str, obj: T) {
@@ -155,7 +218,7 @@ impl StubbyState {
 
     /// Fetches the value stored in the `StubbyState` for the given name.
     ///
-    /// Usually you won't need to call this function directly, instead preferring [`stub_if_some!`]
+    /// Usually you won't need to call this function directly, instead preferring [`stub_if_found!`] or [`stub!`]
     ///
     /// # Panics
     ///
@@ -163,16 +226,15 @@ impl StubbyState {
     ///
     #[cfg(not(test))]
     #[allow(unused)]
-    pub fn get<T: Clone + 'static>(&self, name: &'static str) -> T {
-        panic!("should not have mocks being used outside of #[cfg(test)]");
+    pub fn get<T: Clone + 'static>(&self, name: &'static str) -> Option<T> {
+        panic!("should not have stubs being used outside of #[cfg(test)]");
     }
     #[cfg(test)]
-    pub fn get<T: Clone + 'static>(&self, name: &'static str) -> T {
-        self.0
-            .get(&name)
-            .unwrap_or_else(|| panic!("no stub configured for {name}"))
-            .downcast_ref::<T>()
-            .unwrap_or_else(|| panic!("incorrect type supplied for {name}"))
-            .clone()
+    pub fn get<T: Clone + 'static>(&self, name: &'static str) -> Option<T> {
+        self.0.get(&name).map(|any| {
+            any.downcast_ref::<T>()
+                .unwrap_or_else(|| panic!("incorrect type supplied for {name}"))
+                .clone()
+        })
     }
 }
