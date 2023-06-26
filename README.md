@@ -14,6 +14,34 @@ Stolen from [Wikipedia](https://en.wikipedia.org/wiki/Mock_object):
 >* it does not yet exist or may change behavior; 
 >* it would have to include information and methods exclusively for testing purposes (and not for its actual task).
 
+## Usage example
+
+```rust
+use stubby::*;
+
+struct TestStruct(Option<StubbyState>);
+
+impl TestStruct {
+    fn foo(&self) -> i32 {
+        stub_if_some!(&self.0);
+        10
+    }
+}
+
+fn main() {
+    let ts = TestStruct(None);
+    assert_eq!(ts.foo(), 10);
+}
+
+#[test]
+fn demo() {
+    let mut mock = StubbyState::default();
+    mock.insert(fn_name!(TestStruct::foo), 15);
+    let ts = TestStruct(mock.into());
+    assert_eq!(ts.foo(), 15);
+}
+```
+
 ## Why is mocking/stubbing in Rust so difficult? (Comparison to [`mockall`](https://lib.rs/crates/mockall))
 
 Mocking in Rust is difficult because strong typing and compiling to machine code don't give any flexibility to mess with data/behaviour, like you would have in a duck-typed language, or a language with some kind of interpreter.
