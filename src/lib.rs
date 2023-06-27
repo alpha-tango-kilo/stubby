@@ -109,7 +109,7 @@ macro_rules! stub {
         {
             let name = fn_name!();
             $mock
-                .get()
+                .get(name)
                 .unwrap_or_else(|| panic!("no stub configured for {name}"))
         }
     };
