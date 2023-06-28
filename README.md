@@ -70,6 +70,6 @@ It does this by instead storing mocking behaviour as an attribute of the struct 
 Avoiding procedural macros means slightly more boilerplate, though thanks to `stub!` and `stub_if_some!` that's usually only a single line per method.
 `stubby` still has zero cost when compiled in release mode by replacing its state with `()`, but it still presents the exact same interface in order to give your IDE the easiest time of it.
 
-As a bonus, `stubby` compiles far faster as it has zero dependencies, only uses declarative macros, and has under 200 SLoC!
+As a bonus, `stubby` compiles far faster as it has zero dependencies, only uses declarative macros, and has under 250 SLoC!
 
 That having been said, it has only one of [`mockall`](https://lib.rs/crates/mockall)'s many features, and so if you're after a more feature-complete solution, check it out instead!
