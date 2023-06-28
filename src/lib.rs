@@ -1,4 +1,4 @@
-#![warn(missing_docs)]
+#![cfg_attr(debug_assertions, warn(missing_docs))]
 #![doc = include_str!("../README.md")]
 
 use std::cmp::Ordering;
@@ -32,8 +32,7 @@ macro_rules! fn_name {
 /// For unconditional stubbing, use [`stub!`]
 ///
 /// ```no_run
-/// use stubby::*;
-///
+/// # use stubby::*;
 /// struct FizzBuzzer(StubbyState);
 ///
 /// impl FizzBuzzer {
@@ -62,6 +61,8 @@ macro_rules! stub_if_found {
     ($mock:expr) => {
         #[cfg(test)]
         {
+            #[cfg(not(debug_assertions))]
+            compile_error!("stubby does not work in release mode, do not run tests with --release");
             if let Some(t) = $mock.get(fn_name!()) {
                 return t;
             }
@@ -109,6 +110,8 @@ macro_rules! stub {
     ($mock:expr) => {
         #[cfg(test)]
         {
+            #[cfg(not(debug_assertions))]
+            compile_error!("stubby does not work in release mode, do not run tests with --release");
             let name = fn_name!();
             $mock
                 .get(name)
@@ -137,12 +140,12 @@ impl fmt::Display for StubbyName {
     }
 }
 
-#[cfg(test)]
+#[cfg(debug_assertions)]
 type StubbyFunction = Box<dyn Fn() -> Box<dyn std::any::Any>>;
 
-#[cfg(not(test))]
+#[cfg(not(debug_assertions))]
 type StubbyStateInner = ();
-#[cfg(test)]
+#[cfg(debug_assertions)]
 type StubbyStateInner = std::collections::BTreeMap<StubbyName, StubbyFunction>;
 
 /// Stores stub information.
@@ -156,11 +159,13 @@ type StubbyStateInner = std::collections::BTreeMap<StubbyName, StubbyFunction>;
 ///
 /// Unfortunately, it's not possible for `StubbyState` to implement `Copy`, as in test mode it contains a [`BTreeMap`](std::collections::BTreeMap)
 ///
-/// # What actually is `StubbyState`, and how is it a ZST outside of tests?
+/// # What actually is `StubbyState`, and how is it zero-sized in release mode?
 ///
-/// In `#[cfg(test)]`, `StubbyState` contains a map of function names to boxed closures that return the stub values
+/// In `#[cfg(debug_assertions)]`, `StubbyState` contains a map of function names to boxed closures that return the stub values
 ///
-/// In `#[cfg(not(test))`, `StubbyState` contains `()`
+/// In `#[cfg(not(debug_assertions))`, `StubbyState` contains `()`
+///
+/// `debug_assertions` has to be used as opposed to `test` because when running `cargo test`, dependencies are compiled in debug mode, not test mode
 #[derive(Default)]
 pub struct StubbyState(StubbyStateInner);
 
@@ -177,8 +182,7 @@ impl StubbyState {
     /// This will lead to a panic when the value is accessed.
     ///
     /// ```no_run
-    /// use stubby::*;
-    ///
+    /// # use stubby::*;
     /// struct Foo(StubbyState);
     ///
     /// impl Foo {
@@ -199,7 +203,6 @@ impl StubbyState {
     ///
     /// ```no_run
     /// # use stubby::*;
-    ///
     /// struct Foo(StubbyState);
     ///
     /// impl Foo {
@@ -217,14 +220,14 @@ impl StubbyState {
     /// // Good! Numeric type specified in literal
     /// stubs.insert(fn_name!(Foo::return_four), 5u32);
     /// ```
-    #[cfg(not(test))]
+    #[cfg(debug_assertions)]
+    pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
+        self.0.insert(name, cloneable_into_stubby_function(obj));
+    }
+    #[cfg(not(debug_assertions))]
     #[allow(unused)]
     pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
         panic!("should not have stubs being used outside of #[cfg(test)]");
-    }
-    #[cfg(test)]
-    pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
-        self.0.insert(name, cloneable_into_stubby_function(obj));
     }
 
     /// Adds a new function to be stubbed using the given function/closure.
@@ -251,7 +254,15 @@ impl StubbyState {
     ///     assert_eq!(not_clone.sum_with(10), NotClone(0, StubbyState::default()));
     /// }
     /// ```
-    #[cfg(not(test))]
+    #[cfg(debug_assertions)]
+    pub fn insert_with<T: 'static>(
+        &mut self,
+        name: StubbyName,
+        func: impl Fn() -> T + 'static,
+    ) {
+        self.0.insert(name, Box::new(move || Box::new(func())));
+    }
+    #[cfg(not(debug_assertions))]
     #[allow(unused)]
     pub fn insert_with<T: 'static>(
         &mut self,
@@ -259,14 +270,6 @@ impl StubbyState {
         func: impl Fn() -> T + 'static,
     ) {
         panic!("should not have stubs being used outside of #[cfg(test)]");
-    }
-    #[cfg(test)]
-    pub fn insert_with<T: 'static>(
-        &mut self,
-        name: StubbyName,
-        func: impl Fn() -> T + 'static,
-    ) {
-        self.0.insert(name, Box::new(move || Box::new(func())));
     }
 
     /// Fetches the value stored in the `StubbyState` for the given name.
@@ -277,12 +280,7 @@ impl StubbyState {
     ///
     /// If the `name` isn't stored, or if the value associated with `name` isn't a `T`
     ///
-    #[cfg(not(test))]
-    #[allow(unused)]
-    pub fn get<T: 'static>(&self, name: StubbyName) -> Option<T> {
-        panic!("should not have stubs being used outside of #[cfg(test)]");
-    }
-    #[cfg(test)]
+    #[cfg(debug_assertions)]
     pub fn get<T: 'static>(&self, name: StubbyName) -> Option<T> {
         self.0.get(&name).map(|stubby_fn: &StubbyFunction| {
             *stubby_fn().downcast::<T>().unwrap_or_else(|_| {
@@ -290,14 +288,19 @@ impl StubbyState {
             })
         })
     }
+    #[cfg(not(debug_assertions))]
+    #[allow(unused)]
+    pub fn get<T: 'static>(&self, name: StubbyName) -> Option<T> {
+        panic!("should not have stubs being used outside of #[cfg(test)]");
+    }
 }
 
 impl fmt::Debug for StubbyState {
-    #[cfg(not(test))]
+    #[cfg(not(debug_assertions))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("StubbyState").finish()
     }
-    #[cfg(test)]
+    #[cfg(debug_assertions)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // StubbyFunction is !Debug, so just substitute it for a fixed string
         // It's not like I had any useful type information anyway lol
@@ -347,7 +350,7 @@ impl Ord for StubbyState {
     }
 }
 
-#[cfg(test)]
+#[cfg(debug_assertions)]
 fn cloneable_into_stubby_function<T: Clone + 'static>(
     obj: T,
 ) -> StubbyFunction {
