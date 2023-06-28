@@ -1,9 +1,14 @@
 #![cfg_attr(debug_assertions, warn(missing_docs))]
 #![doc = include_str!("../README.md")]
 
-use std::cmp::Ordering;
-use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::{
+    cmp::Ordering,
+    fmt,
+    hash::{
+        Hash,
+        Hasher,
+    },
+};
 
 /// Gets the name of the current or given function as a [`StubbyName`]
 #[macro_export]
@@ -26,8 +31,8 @@ macro_rules! fn_name {
     }};
 }
 
-/// Use at the start of a method to return a stub when in `#[cfg(test)]`, **if one is found**.
-/// If no stub is set, then the method executes normally
+/// Use at the start of a method to return a stub when in `#[cfg(test)]`, **if
+/// one is found**. If no stub is set, then the method executes normally
 ///
 /// For unconditional stubbing, use [`stub!`]
 ///
@@ -37,12 +42,12 @@ macro_rules! fn_name {
 ///
 /// impl FizzBuzzer {
 ///     fn start(&self) -> String {
-///         stub_if_found!(&self.0);                 // 👈 here!
+///         stub_if_found!(&self.0); // 👈 here!
 ///         String::from("this if no stub provided")
 ///     }
 ///
 ///     fn next(&self) -> String {
-///         stub_if_found!(&self.0);                 // 👈 here!
+///         stub_if_found!(&self.0); // 👈 here!
 ///         String::from("this if no stub provided")
 ///     }
 /// }
@@ -50,7 +55,10 @@ macro_rules! fn_name {
 /// #[test]
 /// fn fizzbuzzer_start() {
 ///     let mut state = StubbyState::default();
-///     state.insert(fn_name!(FizzBuzzer::start), String::from("stub response!"));
+///     state.insert(
+///         fn_name!(FizzBuzzer::start),
+///         String::from("stub response!"),
+///     );
 ///     let fizzbuzzer = FizzBuzzer(state);
 ///     assert_eq!(fizzbuzzer.start(), String::from("stub response!"));
 ///     assert_eq!(fizzbuzzer.next(), String::from("this if no stub provided"));
@@ -62,7 +70,10 @@ macro_rules! stub_if_found {
         #[cfg(test)]
         {
             #[cfg(not(debug_assertions))]
-            compile_error!("stubby does not work in release mode, do not run tests with --release");
+            compile_error!(
+                "stubby does not work in release mode, do not run tests with \
+                 --release"
+            );
             if let Some(t) = $mock.get(fn_name!()) {
                 return t;
             }
@@ -111,7 +122,10 @@ macro_rules! stub {
         #[cfg(test)]
         {
             #[cfg(not(debug_assertions))]
-            compile_error!("stubby does not work in release mode, do not run tests with --release");
+            compile_error!(
+                "stubby does not work in release mode, do not run tests with \
+                 --release"
+            );
             let name = fn_name!();
             $mock
                 .get(name)
@@ -123,7 +137,8 @@ macro_rules! stub {
 /// An interned string type for holding function names.
 /// Returned by [`fn_name!`]
 ///
-/// Prevents trying to store mocks in [`StubbyState`] by just giving the method name as a `&str`
+/// Prevents trying to store mocks in [`StubbyState`] by just giving the method
+/// name as a `&str`
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct StubbyName(&'static str);
 
@@ -153,19 +168,27 @@ type StubbyStateInner = std::collections::BTreeMap<StubbyName, StubbyFunction>;
 ///
 /// # Will `StubbyState` effect my `Eq`, `Ord`, `Hash`, `Clone` (etc.) derived traits?
 ///
-/// `StubbyState` tries to implement as many traits as possible in order for maximum compatibility with the struct/enum that you're adding `stubby` to.
-/// These trait implementations aim is to stay out of the way of derived implementations (i.e. `StubbyState` shouldn't affect `==`), which means that **most `StubbyState` trait implementations do not behave as they 'should'** (i.e. one `StubbyState` is always equal to another).
-/// Please read the documentation for the individual traits if you want to see how `StubbyState` behaves.
+/// `StubbyState` tries to implement as many traits as possible in order for
+/// maximum compatibility with the struct/enum that you're adding `stubby` to.
+/// These trait implementations aim is to stay out of the way of derived
+/// implementations (i.e. `StubbyState` shouldn't affect `==`), which means that
+/// **most `StubbyState` trait implementations do not behave as they 'should'**
+/// (i.e. one `StubbyState` is always equal to another). Please read the
+/// documentation for the individual traits if you want to see how `StubbyState`
+/// behaves.
 ///
-/// Unfortunately, it's not possible for `StubbyState` to implement `Copy`, as in test mode it contains a [`BTreeMap`](std::collections::BTreeMap)
+/// Unfortunately, it's not possible for `StubbyState` to implement `Copy`, as
+/// in test mode it contains a [`BTreeMap`](std::collections::BTreeMap)
 ///
 /// # What actually is `StubbyState`, and how is it zero-sized in release mode?
 ///
-/// In `#[cfg(debug_assertions)]`, `StubbyState` contains a map of function names to boxed closures that return the stub values
+/// In `#[cfg(debug_assertions)]`, `StubbyState` contains a map of function
+/// names to boxed closures that return the stub values
 ///
 /// In `#[cfg(not(debug_assertions))`, `StubbyState` contains `()`
 ///
-/// `debug_assertions` has to be used as opposed to `test` because when running `cargo test`, dependencies are compiled in debug mode, not test mode
+/// `debug_assertions` has to be used as opposed to `test` because when running
+/// `cargo test`, dependencies are compiled in debug mode, not test mode
 #[derive(Default)]
 pub struct StubbyState(StubbyStateInner);
 
@@ -178,8 +201,9 @@ impl StubbyState {
     /// Adds a new function to be stubbed with the given `obj`.
     /// Repeated `insert`s will overwrite existing entries.
     ///
-    /// Note: no type checking is done to ensure `obj` is the correct return type for the function.
-    /// This will lead to a panic when the value is accessed.
+    /// Note: no type checking is done to ensure `obj` is the correct return
+    /// type for the function. This will lead to a panic when the value is
+    /// accessed.
     ///
     /// ```no_run
     /// # use stubby::*;
@@ -224,6 +248,7 @@ impl StubbyState {
     pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
         self.0.insert(name, cloneable_into_stubby_function(obj));
     }
+
     #[cfg(not(debug_assertions))]
     #[allow(unused)]
     pub fn insert<T: Clone + 'static>(&mut self, name: StubbyName, obj: T) {
@@ -248,8 +273,10 @@ impl StubbyState {
     /// #[test]
     /// fn not_clone_new() {
     ///     let mut stubs = StubbyState::new();
-    ///     stubs.insert_with(fn_name!(NotClone::sum_with), || NotClone(0, StubbyState::default()));
-    ///     
+    ///     stubs.insert_with(fn_name!(NotClone::sum_with), || {
+    ///         NotClone(0, StubbyState::default())
+    ///     });
+    ///
     ///     let not_clone = NotClone(10, stubs);
     ///     assert_eq!(not_clone.sum_with(10), NotClone(0, StubbyState::default()));
     /// }
@@ -262,6 +289,7 @@ impl StubbyState {
     ) {
         self.0.insert(name, Box::new(move || Box::new(func())));
     }
+
     #[cfg(not(debug_assertions))]
     #[allow(unused)]
     pub fn insert_with<T: 'static>(
@@ -274,12 +302,13 @@ impl StubbyState {
 
     /// Fetches the value stored in the `StubbyState` for the given name.
     ///
-    /// Usually you won't need to call this function directly, instead preferring [`stub_if_found!`] or [`stub!`]
+    /// Usually you won't need to call this function directly, instead
+    /// preferring [`stub_if_found!`] or [`stub!`]
     ///
     /// # Panics
     ///
-    /// If the `name` isn't stored, or if the value associated with `name` isn't a `T`
-    ///
+    /// If the `name` isn't stored, or if the value associated with `name` isn't
+    /// a `T`
     #[cfg(debug_assertions)]
     pub fn get<T: 'static>(&self, name: StubbyName) -> Option<T> {
         self.0.get(&name).map(|stubby_fn: &StubbyFunction| {
@@ -288,6 +317,7 @@ impl StubbyState {
             })
         })
     }
+
     #[cfg(not(debug_assertions))]
     #[allow(unused)]
     pub fn get<T: 'static>(&self, name: StubbyName) -> Option<T> {
@@ -300,6 +330,7 @@ impl fmt::Debug for StubbyState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("StubbyState").finish()
     }
+
     #[cfg(debug_assertions)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // StubbyFunction is !Debug, so just substitute it for a fixed string
@@ -359,7 +390,10 @@ fn cloneable_into_stubby_function<T: Clone + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{StubbyName, StubbyState};
+    use crate::{
+        StubbyName,
+        StubbyState,
+    };
 
     #[test]
     fn not_cloneable() {
