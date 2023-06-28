@@ -1,7 +1,9 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
+use std::cmp::Ordering;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 /// Gets the name of the current or given function as a [`StubbyName`]
 #[macro_export]
@@ -146,9 +148,19 @@ type StubbyStateInner = std::collections::BTreeMap<StubbyName, StubbyFunction>;
 /// Stores stub information.
 /// Initialise with [`StubbyState::new`] or [`StubbyState::default`]
 ///
-/// In `#[cfg(test)]`, contains a map of function names to return types (as `Box<dyn Any>`).
+/// # Will `StubbyState` effect my `Eq`, `Ord`, `Hash`, `Clone` (etc.) derived traits?
 ///
-/// In `#[cfg(not(test))`, contains `()`.
+/// `StubbyState` tries to implement as many traits as possible in order for maximum compatibility with the struct/enum that you're adding `stubby` to.
+/// These trait implementations aim is to stay out of the way of derived implementations (i.e. `StubbyState` shouldn't affect `==`), which means that **most `StubbyState` trait implementations do not behave as they 'should'** (i.e. one `StubbyState` is always equal to another).
+/// Please read the documentation for the individual traits if you want to see how `StubbyState` behaves.
+///
+/// Unfortunately, it's not possible for `StubbyState` to implement `Copy`, as in test mode it contains a [`BTreeMap`](std::collections::BTreeMap)
+///
+/// # What actually is `StubbyState`, and how is it a ZST outside of tests?
+///
+/// In `#[cfg(test)]`, `StubbyState` contains a map of function names to boxed closures that return the stub values
+///
+/// In `#[cfg(not(test))`, `StubbyState` contains `()`
 #[derive(Default)]
 pub struct StubbyState(StubbyStateInner);
 
@@ -295,6 +307,43 @@ impl fmt::Debug for StubbyState {
             .map(|name| (name, "StubbyFunction"))
             .collect::<std::collections::BTreeMap<_, _>>();
         f.debug_tuple("StubbyState").field(&inner_debug).finish()
+    }
+}
+
+impl Clone for StubbyState {
+    /// Returns an empty `StubbyState`
+    fn clone(&self) -> Self {
+        StubbyState::default()
+    }
+}
+
+impl PartialEq for StubbyState {
+    /// Always returns true
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for StubbyState {}
+
+impl Hash for StubbyState {
+    /// Fixed hash
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.finish();
+    }
+}
+
+impl PartialOrd for StubbyState {
+    /// `StubbyState`s are always equal in order
+    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
+        Some(Ordering::Equal)
+    }
+}
+
+impl Ord for StubbyState {
+    /// `StubbyState`s are always equal in order
+    fn cmp(&self, _other: &Self) -> Ordering {
+        Ordering::Equal
     }
 }
 
