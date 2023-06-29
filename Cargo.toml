@@ -12,3 +12,6 @@ homepage = "https://codeberg.org/alpha-tango-kilo/stubby"
 repository = "https://codeberg.org/alpha-tango-kilo/stubby"
 
 [dependencies]
+
+[dev-dependencies]
+tokio = { version = "1.29.0", features = ["rt", "macros"] }

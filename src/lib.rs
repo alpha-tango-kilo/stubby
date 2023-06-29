@@ -4,6 +4,20 @@
 use std::fmt;
 
 /// Gets the name of the current or given function as a [`StubbyName`]
+///
+/// # Limitations
+///
+/// This macro relies on some hacks to try and ensure that the produced
+/// [`StubbyName`] is the same both with parameter-less invocations in the
+/// method, and named function invocations in your tests. These hacks are due to
+/// limitations/discrepancies in the output of [`std::any::type_name`]
+///
+/// Things that won't work:
+/// * Separate stubs for the same method with different generic parameters -
+///   only one stub per method, regardless of generics
+/// * Using [`stub!`] or [`stub_if_found!`] within a closure (you probably
+///   shouldn't be doing this anyway) - the parent method's name will be
+///   taken/used
 #[macro_export]
 macro_rules! fn_name {
     () => {{
@@ -13,14 +27,35 @@ macro_rules! fn_name {
             std::any::type_name::<T>()
         }
         let name = type_name_of(f);
-        // `3` is the length of the `::f`.
-        $crate::StubbyName::__macro_new(&name[..name.len() - 3])
+        // `3` is the length of the `::f`
+        let name = &name[..name.len() - 3];
+        // async generic functions end up with ::{{closure}} at the end, trim
+        // that so it matches the other macro invocation
+        let name = name.trim_end_matches("::{{closure}}");
+        $crate::StubbyName::__macro_new(name)
     }};
     ($fn:expr) => {{
         fn type_name_of<T>(_: T) -> &'static str {
             std::any::type_name::<T>()
         }
-        $crate::StubbyName::__macro_new(type_name_of($fn))
+        let name = type_name_of($fn);
+        // Generic parameters show in this stubby form, but not the other, so
+        // trim them here
+        let has_generic = name.ends_with('>');
+        let name = if has_generic {
+            // FooBar<BazQux> -> FooBar
+            let mut done = false;
+            name.trim_end_matches(|c| {
+                if c == '<' {
+                    done = true;
+                    return true;
+                }
+                !done
+            })
+        } else {
+            name
+        };
+        $crate::StubbyName::__macro_new(name)
     }};
 }
 
@@ -133,6 +168,7 @@ macro_rules! stub {
 /// Prevents trying to store mocks in [`StubbyState`] by just giving the method
 /// name as a `&str`
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[cfg_attr(test, derive(Default))]
 pub struct StubbyName(&'static str);
 
 impl StubbyName {
@@ -456,8 +492,39 @@ mod tests {
         }
 
         let mut stubby = StubbyState::new();
-        stubby.insert_with(StubbyName(""), producer);
+        stubby.insert_with(StubbyName::default(), producer);
 
-        stubby.get::<NotClone>(StubbyName("")).unwrap();
+        stubby.get::<NotClone>(StubbyName::default()).unwrap();
+    }
+
+    #[test]
+    fn generics() {
+        fn f<T>() -> StubbyName {
+            fn_name!()
+        }
+
+        // See Limitations section in `fn_name!`
+        assert_eq!(fn_name!(f::<i32>), f::<i32>());
+        assert_eq!(fn_name!(f::<i32>), f::<bool>());
+    }
+
+    #[test]
+    fn closures() {
+        fn f() -> StubbyName {
+            (|| fn_name!())()
+        }
+
+        // See Limitations section in `fn_name!`
+        assert_eq!(fn_name!(f), f());
+    }
+
+    #[tokio::test]
+    async fn async_with_lifetime_parameter() {
+        async fn f<'a>() -> StubbyName {
+            fn_name!()
+        }
+
+        // See Limitations section in `fn_name!`
+        assert_eq!(fn_name!(f), f().await);
     }
 }
