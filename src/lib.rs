@@ -499,6 +499,7 @@ mod tests {
 
     #[test]
     fn generics() {
+        #[allow(clippy::extra_unused_type_parameters)]
         fn f<T>() -> StubbyName {
             fn_name!()
         }
@@ -510,6 +511,10 @@ mod tests {
 
     #[test]
     fn closures() {
+        #[allow(
+            clippy::extra_unused_type_parameters,
+            clippy::redundant_closure_call
+        )]
         fn f() -> StubbyName {
             (|| fn_name!())()
         }
