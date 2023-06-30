@@ -5,6 +5,7 @@ categories = ["development-tools::testing"]
 keywords = ["mock", "stub", "mocking", "stubbing", "testing"]
 version = "0.2.5"
 edition = "2021"
+rust-version = "1.58"
 authors = ["alpha-tango-kilo <git@heyatk.com>"]
 readme = "README.md"
 license = "MIT OR Apache-2.0"
