@@ -198,7 +198,7 @@ macro_rules! stubby_state {
         use $crate::*;
 
         #[cfg(debug_assertions)]
-        type StubbyFunction = Box<dyn Fn() -> Box<dyn std::any::Any $(+ $t)*> $(+ $t)*>;
+        type StubbyFunction = Box<dyn Fn() -> Box<dyn std::any::Any> $(+ $t)*>;
 
         #[cfg(not(debug_assertions))]
         type StubbyStateInner = ();
@@ -341,7 +341,7 @@ macro_rules! stubby_state {
             /// }
             /// ```
             #[cfg(debug_assertions)]
-            pub fn insert_with<T: $($t +)* 'static>(
+            pub fn insert_with<T: 'static>(
                 &mut self,
                 name: StubbyName,
                 func: impl Fn() -> T + $($t +)* 'static,
@@ -350,7 +350,7 @@ macro_rules! stubby_state {
             }
             #[cfg(not(debug_assertions))]
             #[allow(unused)]
-            pub fn insert_with<T: $($t +)* 'static>(
+            pub fn insert_with<T: 'static>(
                 &mut self,
                 name: StubbyName,
                 func: impl Fn() -> T + $($t +)* 'static,
