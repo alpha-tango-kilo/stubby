@@ -1,3 +1,7 @@
+#![cfg_attr(
+    feature = "type-safe",
+    feature(fn_traits, unboxed_closures, tuple_trait)
+)]
 #![cfg_attr(debug_assertions, warn(missing_docs))]
 #![doc = include_str!("../README.md")]
 
@@ -25,7 +29,7 @@ use std::{
 /// * Using [`stub!`] or [`stub_if_found!`] within a closure (you probably
 ///   shouldn't be doing this anyway) - the parent method's name will be
 ///   taken/used
-#[macro_export]
+#[cfg_attr(not(feature = "type-safe"), macro_export)]
 macro_rules! fn_name {
     () => {{
         // Hack from https://docs.rs/stdext/0.2.1/src/stdext/macros.rs.html#61-72
@@ -281,7 +285,7 @@ impl StubbyState {
     /// // Good! Numeric type specified in literal
     /// stubs.insert(fn_name!(Foo::return_four), 5u32);
     /// ```
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, not(feature = "type-safe")))]
     pub fn insert<T: Clone + Send + Sync + 'static>(
         &mut self,
         name: StubbyName,
@@ -290,13 +294,54 @@ impl StubbyState {
         self.0.insert(name, cloneable_into_stubby_function(obj));
     }
 
-    #[cfg(not(debug_assertions))]
-    #[allow(unused)]
+    /// Adds a new function to be stubbed with the given `obj`. Repeated
+    /// `insert`s will overwrite existing entries
+    ///
+    /// For types that aren't `Clone + Send + Sync`, use [`insert_with`]
+    ///
+    /// ```no_run
+    /// # use stubby::*;
+    /// struct Foo(StubbyState);
+    ///
+    /// impl Foo {
+    ///     fn return_four(&self) -> &'static str {
+    ///         stub_if_found!(&self.0);
+    ///         "four"
+    ///     }
+    /// }
+    ///
+    /// let mut stubs = StubbyState::new();
+    /// stubs.insert(Foo::return_four, "five");
+    /// ```
+    #[cfg(all(debug_assertions, feature = "type-safe"))]
+    pub fn insert<Args, F>(&mut self, func: F, obj: F::Output)
+    where
+        F: FnOnce<Args>,
+        F::Output: Clone + Send + Sync + 'static,
+        Args: std::marker::Tuple,
+    {
+        self.0
+            .insert(fn_name!(func), cloneable_into_stubby_function(obj));
+    }
+
+    #[cfg(all(not(debug_assertions), not(feature = "type-safe")))]
+    #[allow(unused_variables)]
     pub fn insert<T: Clone + Send + Sync + 'static>(
         &mut self,
         name: StubbyName,
         obj: T,
     ) {
+        panic!("should not have stubs being used outside of #[cfg(test)]");
+    }
+
+    #[cfg(all(not(debug_assertions), feature = "type-safe"))]
+    #[allow(unused_variables)]
+    pub fn insert<Args, F>(&mut self, func: F, obj: F::Output)
+    where
+        F: FnOnce<Args>,
+        F::Output: Clone + Send + Sync + 'static,
+        Args: std::marker::Tuple,
+    {
         panic!("should not have stubs being used outside of #[cfg(test)]");
     }
 
@@ -308,27 +353,27 @@ impl StubbyState {
     /// ```no_run
     /// use stubby::*;
     ///
-    /// struct NotClone(i32, StubbyState);
+    /// struct NotClone(i32);
     ///
-    /// impl NotClone {
-    ///     fn sum_with(&self, a: i32) -> Self {
+    /// struct Foo(i32, StubbyState);
+    ///
+    /// impl Foo {
+    ///     fn wrap_a(&self, a: i32) -> NotClone {
     ///         stub!(&self.1);
-    ///         NotClone(self.0 + a, StubbyState::default())
+    ///         NotClone(a)
     ///     }
     /// }
     ///
     /// #[test]
     /// fn not_clone_new() {
     ///     let mut stubs = StubbyState::new();
-    ///     stubs.insert_with(fn_name!(NotClone::sum_with), || {
-    ///         NotClone(0, StubbyState::default())
-    ///     });
+    ///     stubs.insert_with(fn_name!(Foo::print_a), || NotClone(1));
     ///
-    ///     let not_clone = NotClone(10, stubs);
-    ///     assert_eq!(not_clone.sum_with(10), NotClone(0, StubbyState::default()));
+    ///     let not_clone = Foo(10, stubs);
+    ///     assert_eq!(not_clone.sum_with(10), NotClone(1));
     /// }
     /// ```
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, not(feature = "type-safe")))]
     pub fn insert_with<T: 'static>(
         &mut self,
         name: StubbyName,
@@ -337,12 +382,64 @@ impl StubbyState {
         self.0.insert(name, Box::new(move || Box::new(func())));
     }
 
-    #[cfg(not(debug_assertions))]
+    /// Adds a new function to be stubbed using the given function/closure
+    ///
+    /// Used for return types that aren't `Clone + Send + Sync`. If you don't
+    /// need this, you can use [`insert`] instead
+    ///
+    /// ```no_run
+    /// use stubby::*;
+    ///
+    /// struct NotClone(i32);
+    ///
+    /// struct Foo(i32, StubbyState);
+    ///
+    /// impl Foo {
+    ///     fn wrap_a(&self, a: i32) -> NotClone {
+    ///         stub!(&self.1);
+    ///         NotClone(a)
+    ///     }
+    /// }
+    ///
+    /// #[test]
+    /// fn not_clone_new() {
+    ///     let mut stubs = StubbyState::new();
+    ///     stubs.insert_with(Foo::print_a, || NotClone(1));
+    ///
+    ///     let not_clone = Foo(10, stubs);
+    ///     assert_eq!(not_clone.sum_with(10), NotClone(1));
+    /// }
+    /// ```
+    #[cfg(all(debug_assertions, feature = "type-safe"))]
+    pub fn insert_with<Args, F>(
+        &mut self,
+        func: F,
+        closure: impl Fn() -> F::Output + Send + Sync + 'static,
+    ) where
+        F: FnOnce<Args>,
+        F::Output: 'static,
+        Args: std::marker::Tuple,
+    {
+        self.0
+            .insert(fn_name!(func), Box::new(move || Box::new(closure())));
+    }
+
+    #[cfg(all(not(debug_assertions), not(feature = "type-safe")))]
     #[allow(unused)]
     pub fn insert_with<T: 'static>(
         &mut self,
         name: StubbyName,
         func: impl Fn() -> T + Send + Sync + 'static,
+    ) {
+        panic!("should not have stubs being used outside of #[cfg(test)]");
+    }
+
+    #[cfg(all(not(debug_assertions), feature = "type-safe"))]
+    #[allow(unused)]
+    pub fn insert_with<T: 'static>(
+        &mut self,
+        func: F,
+        closure: impl Fn() -> F::Output + Send + Sync + 'static,
     ) {
         panic!("should not have stubs being used outside of #[cfg(test)]");
     }
@@ -436,7 +533,7 @@ fn cloneable_into_stubby_function<T: Clone + Send + Sync + 'static>(
     Box::new(move || Box::new(obj.clone()))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "type-safe")))]
 mod tests {
     use super::*;
 

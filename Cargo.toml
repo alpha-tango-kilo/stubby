@@ -12,6 +12,9 @@ license = "MIT OR Apache-2.0"
 homepage = "https://codeberg.org/alpha-tango-kilo/stubby"
 repository = "https://codeberg.org/alpha-tango-kilo/stubby"
 
+[features]
+type-safe = []
+
 [dependencies]
 
 [dev-dependencies]
