@@ -20,7 +20,7 @@ You can `cargo add stubby`, or in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-stubby = "0.2"
+stubby = "0.3"
 ```
 
 Note that `stubby` has to go in your regular dependencies, not dev dependencies.
