@@ -166,9 +166,12 @@ macro_rules! stub {
                  --release"
             );
             let name = fn_name!();
-            $mock
-                .get(name)
-                .unwrap_or_else(|| panic!("no stub configured for {name}"))
+            // Add always-true condition so that IDEs don't realise the return is unconditional (IntelliJ)
+            if true {
+                return $mock.get(name).unwrap_or_else(|| {
+                    panic!("no stub configured for {name}")
+                });
+            }
         }
     };
 }
