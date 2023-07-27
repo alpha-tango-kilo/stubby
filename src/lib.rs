@@ -113,7 +113,7 @@ macro_rules! stub_if_found {
                 "stubby does not work in release mode, do not run tests with \
                  --release"
             );
-            if let Some(t) = $mock.get(fn_name!()) {
+            if let Some(t) = $mock.get($crate::fn_name!()) {
                 return t;
             }
         }
@@ -165,8 +165,9 @@ macro_rules! stub {
                 "stubby does not work in release mode, do not run tests with \
                  --release"
             );
-            let name = fn_name!();
-            // Add always-true condition so that IDEs don't realise the return is unconditional (IntelliJ)
+            let name = $crate::fn_name!();
+            // Add always-true condition so that IDEs don't realise the return
+            // is unconditional (IntelliJ)
             if true {
                 return $mock.get(name).unwrap_or_else(|| {
                     panic!("no stub configured for {name}")
