@@ -518,8 +518,8 @@ impl Hash for StubbyState {
 
 impl PartialOrd for StubbyState {
     /// `StubbyState`s are always equal in order
-    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
-        Some(Ordering::Equal)
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
