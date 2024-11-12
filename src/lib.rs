@@ -31,6 +31,7 @@ use std::{
 /// * Using [`stub!`] or [`stub_if_found!`] within a closure (you probably
 ///   shouldn't be doing this anyway) - the parent method's name will be
 ///   taken/used
+#[allow(unused_macros)]
 #[cfg_attr(not(feature = "type-safe"), macro_export)]
 macro_rules! fn_name {
     () => {{
@@ -443,11 +444,15 @@ impl StubbyState {
 
     #[cfg(all(not(debug_assertions), feature = "type-safe"))]
     #[allow(unused)]
-    pub fn insert_with<T: 'static>(
+    pub fn insert_with<Args, F>(
         &mut self,
         func: F,
         closure: impl Fn() -> F::Output + Send + Sync + 'static,
-    ) {
+    ) where
+        F: FnOnce<Args>,
+        F::Output: 'static,
+        Args: std::marker::Tuple,
+    {
         panic!("should not have stubs being used outside of #[cfg(test)]");
     }
 
