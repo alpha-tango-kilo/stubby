@@ -4,6 +4,7 @@
 )]
 #![cfg_attr(debug_assertions, warn(missing_docs))]
 #![deny(rustdoc::broken_intra_doc_links)]
+#![allow(clippy::test_attr_in_doctest)]
 #![doc = include_str!("../README.md")]
 
 use std::{
@@ -513,9 +514,7 @@ impl Eq for StubbyState {}
 
 impl Hash for StubbyState {
     /// Fixed hash
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.finish();
-    }
+    fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
 impl PartialOrd for StubbyState {
