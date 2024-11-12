@@ -247,7 +247,8 @@ impl StubbyState {
     /// Adds a new function to be stubbed with the given `obj`. Repeated
     /// `insert`s will overwrite existing entries
     ///
-    /// For types that aren't `Clone + Send + Sync`, use [`insert_with`]
+    /// For types that aren't `Clone + Send + Sync`, use
+    /// [`insert_with`](StubbyState::insert_with)
     ///
     /// Note: no type checking is done to ensure `obj` is the correct return
     /// type for the function. This will lead to a panic when the value is
