@@ -3,6 +3,7 @@
     feature(fn_traits, unboxed_closures, tuple_trait)
 )]
 #![cfg_attr(debug_assertions, warn(missing_docs))]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
 use std::{
@@ -129,7 +130,7 @@ macro_rules! stub_if_found {
 /// For stubbing sometimes, use [`stub_if_found!`]
 ///
 /// ```no_run
-/// use stubby::*;
+/// # use stubby::*;
 ///
 /// struct FizzBuzzer(StubbyState);
 ///
@@ -301,7 +302,8 @@ impl StubbyState {
     /// Adds a new function to be stubbed with the given `obj`. Repeated
     /// `insert`s will overwrite existing entries
     ///
-    /// For types that aren't `Clone + Send + Sync`, use [`insert_with`]
+    /// For types that aren't `Clone + Send + Sync`, use
+    /// [`insert_with`](StubbyState::insert_with)
     ///
     /// ```no_run
     /// # use stubby::*;
@@ -352,10 +354,10 @@ impl StubbyState {
     /// Adds a new function to be stubbed using the given function/closure
     ///
     /// Used for return types that aren't `Clone + Send + Sync`. If you don't
-    /// need this, you can use [`insert`] instead
+    /// need this, you can use [`insert`](StubbyState::insert) instead
     ///
     /// ```no_run
-    /// use stubby::*;
+    /// # use stubby::*;
     ///
     /// struct NotClone(i32);
     ///
@@ -392,7 +394,7 @@ impl StubbyState {
     /// need this, you can use [`insert`] instead
     ///
     /// ```no_run
-    /// use stubby::*;
+    /// # use stubby::*;
     ///
     /// struct NotClone(i32);
     ///
